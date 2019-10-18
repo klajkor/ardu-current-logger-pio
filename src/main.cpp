@@ -1,10 +1,16 @@
 /**********************************************
 ** Arduino current meter and logger
+**
 ** Modules used:
 **  - INA219, I2C
 **  - DS3231 RTC, I2C
 **  - SSD1306 OLED dsiplay, I2C
 **  - SD card, SPI
+** Libraries used:
+**  - Adafruit INA219 by Adafruit
+**  - SD by Adafruit Industries
+**  - SSD1306Ascii by Bill Greiman
+**  - uRTCLib by Naguissa
 **********************************************/
 
 /* Arduino Nano pinout connections
@@ -19,6 +25,8 @@
  ** CLK - pin D13
  ** CS - pin D4
 */
+
+/* Toolchain: VSCode + Platform.IO */
 
 #include <Arduino.h>
 #include <avr/pgmspace.h>

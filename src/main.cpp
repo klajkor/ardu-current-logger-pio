@@ -44,25 +44,26 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 const int OLED_I2C_ADDR = 0x3C; // Address 0x3C for 128x32
 
 SSD1306AsciiWire display;
 
-// Current and voltage sensor
+// Current and voltage sensor class
 Adafruit_INA219 ina219_monitor;
 
-// DS3231 RTC modul
+// DS3231 RTC modul I2C address
 const int RTC_I2C_addr = 0x68;
+// RTC class
 uRTCLib rtc(RTC_I2C_addr);
 
-// SD card modul
+// SD card modul chip select
 #define SDCARD_CHIP_SELECT 4
 
 
 /* Global variables */
 
-// RTC global variables
+/* RTC global variables */
 uint8_t rtc_second = 0;
 uint8_t rtc_minute = 0;
 uint8_t rtc_hour = 0;
@@ -71,27 +72,26 @@ uint8_t rtc_month = 0;
 uint8_t rtc_year = 0;
 
 // Current sensor variables
-float f_BusVoltage_V;
-float f_ShuntCurrent_mA;
+float f_BusVoltage_V; /** Measured bus voltage */
+float f_ShuntCurrent_mA; /** Measured shunt current */
 
 
 // General variables
-char DateStampString[] = "2000.99.88";
-char TimeStampString[] = "00:00:00";
-char logFileName[] = "mmddHHMM.txt";
-char VoltString[] = "99.999 ";
-char CurrentString[] = "9999.999 ";
-bool SD_log_enabled = false;
+char DateStampString[] = "2000.99.88"; /** String to store date value */
+char TimeStampString[] = "00:00:00"; /** String to store time value */
+char logFileName[] = "mmddHHMM.txt"; /** String to store log file name */
+char VoltString[] = "99.999 "; /** String to store measured voltage value */
+char CurrentString[] = "9999.999 "; /** String to store measured current value */
+bool SD_log_enabled = false; /** Enabling SD logging or not */
 
+// Datafile class
 File dataFile;
 
 
-// Function definitions
-//void setup();
-//void loop();
-//bool Log_To_SD_card(const char *_logfile);
-bool Log_To_SD_card();
-void setTimeStampString();
+/* Function definitions */
+
+bool Log_To_SD_card(void);
+void setTimeStampString(void);
 
 
 //setup()
@@ -105,12 +105,23 @@ void setup()
   //display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR);
   Serial.print(F("SSD1306 init..."));
   #if OLED_RESET >= 0
-  display.begin(&Adafruit128x32, I2C_ADDRESS, RST_PIN);
+      #if SCREEN_HEIGHT == 32
+    display.begin(&Adafruit128x32, I2C_ADDRESS, RST_PIN);
+    #endif
+    #if SCREEN_HEIGHT == 64
+    display.begin(&Adafruit128x64, I2C_ADDRESS, RST_PIN);
+    #endif
   #else // RST_PIN >= 0
-  display.begin(&Adafruit128x32, OLED_I2C_ADDR);
+    #if SCREEN_HEIGHT == 32
+    display.begin(&Adafruit128x32, OLED_I2C_ADDR);
+    #endif
+    #if SCREEN_HEIGHT == 64
+    display.begin(&Adafruit128x64, OLED_I2C_ADDR);
+    #endif
   #endif // RST_PIN >= 0
 
   display.setFont(Adafruit5x7);
+  //display.setFont(X11fixed7x14);
 
   Serial.println(F(" OK"));
   display.clear();
@@ -151,11 +162,9 @@ void loop()
 {
   setTimeStampString();
   
-  // clear display
-  //display.clear();
-  //display.set1X();
   display.setRow(0);
   display.setCol(0);
+  display.set1X();
   
   //display time stamp
   Serial.print(DateStampString);
@@ -172,17 +181,14 @@ void loop()
   f_BusVoltage_V=ina219_monitor.getBusVoltage_V();
   
   //convert to text
-  dtostrf((f_ShuntCurrent_mA),8,3,CurrentString);
+  dtostrf((f_ShuntCurrent_mA),7,2,CurrentString);
   dtostrf(f_BusVoltage_V,6,3,VoltString);
-  //CurrentString=String(f_ShuntCurrent_mA*1000, 4);
-  //CurrentString+=F(" mA");
-  //VoltString="";
-  //VoltString=String(f_BusVoltage_V,4);
-  //VoltString+=F(" V");
   
   //display volt
   Serial.print(VoltString);
   Serial.print(F(" V"));
+  display.set2X();
+  display.print(F("  "));
   display.print(VoltString);
   display.println(F(" V"));
 
@@ -192,6 +198,7 @@ void loop()
   display.print(CurrentString);
   display.println(F(" mA"));
 
+  display.set1X();
   if(SD_log_enabled) {
     Serial.print(F("SD log: "));
     Serial.print(logFileName);
@@ -211,7 +218,11 @@ void loop()
 
 }
 
-void setTimeStampString()
+/**
+* @brief Query date & time and set the [Date|Time]StampStrings & logFileName accordingly.
+* @param void
+*/
+void setTimeStampString(void)
 {
   // get time stamp, convert to a string
   rtc.refresh();
@@ -244,12 +255,15 @@ void setTimeStampString()
   logFileName[5] = DateStampString[6];
   logFileName[6] = DateStampString[8];
   logFileName[7] = DateStampString[9];
-  
-  
+    
 }
 
-//bool Log_To_SD_card(const char *_logfile)
-bool Log_To_SD_card()
+/**
+* @brief Log the measurements with timestamp to SD card in CSV format.
+* @param void
+* @return bool FileOpenSuccess
+*/
+bool Log_To_SD_card(void)
 {
   bool FileOpenSuccess = false;
   
@@ -275,8 +289,7 @@ bool Log_To_SD_card()
     dataFile.print(CurrentString);
     dataFile.print(F(","));
     dataFile.println(F("mA"));
-    dataFile.close();
-    //Serial.println(F(" logfile closed"));
+    dataFile.close();    
   }
   
   return FileOpenSuccess;
